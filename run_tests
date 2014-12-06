@@ -1,0 +1,42 @@
+#! /bin/sh
+set -eu
+
+error () {
+	echo "ERROR: $(basename $TEST) in $T: $*" >>/dev/stderr
+}
+
+assert () {
+	local msg=$1
+	shift
+	if ! "$@" ; then
+		error "$msg"
+	fi
+}
+
+assert_file_exists () {
+	assert "file $1 does not exist" [ -e "$1" ]
+}
+
+assert_file_not_exist () {
+	assert "file $1 exists" [ ! -e "$1" ]
+}
+
+: ${PRESERVE:=false}
+T_BASE=
+trap 'if ! $PRESERVE; then rm -rf ${T_BASE}; fi' EXIT INT
+T_BASE="$(mktemp -d --tmpdir base.mk-test.XXXXX)"
+DIR="$(cd $(dirname "$0"); pwd)"
+for TEST in "$DIR"/tests/*.sh.t; do
+	B_TEST=$(basename "$TEST")
+	T="$T_BASE/$B_TEST"
+	T_LOG="$T_BASE/log-$B_TEST"
+	mkdir -p "$T"
+	. "$TEST"
+	pushd "$T" >/dev/null
+	{ run_test; } >$T_LOG 2>&1 || {
+		echo "I: Test $B_TEST failed"
+		cat "$T_LOG"
+		PRESERVE=true
+	}
+	popd >/dev/null
+done
