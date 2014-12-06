@@ -220,7 +220,6 @@ LDFLAGS ?= $(ALL_CFLAGS) $(OPT) -fuse-linker-plugin
 else ifeq ($(CC_TYPE),clang)
 CFLAGS  ?= -emit-llvm $(DBG_FLAGS) -pipe
 LDFLAGS ?= $(OPT)
-endif
 else
 CFLAGS  ?= $(OPT) $(DBG_FLAGS) -pipe
 endif
