@@ -18,4 +18,7 @@ int main(void)
 EOF
 
 	make
+
+	assert_file_exists test
+	assert_file_exists test.o
 }
