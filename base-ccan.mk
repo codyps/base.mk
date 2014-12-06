@@ -13,8 +13,8 @@ endif
 export CCAN_CFLAGS
 export CCAN_LDFLAGS
 
-$(eval $(call sub-make,ccan/config.h))
-$(eval $(call sub-make,ccan/libccan.a))
+$(eval $(call sub-make-no-clean,ccan/config.h))
+$(eval $(call sub-make-no-clean,ccan/libccan.a))
 .PHONY: ccan/clean
 $(eval $(call sub-make-no-clean,ccan/clean))
 
