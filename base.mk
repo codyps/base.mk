@@ -67,8 +67,6 @@
 #
 # $(ALL_CPPFLAGS)
 #
-# $(O_)		    use this as the output directory if you're writing new rules
-#
 # $(ldflags-some-target)
 # $(ldflags-some-variant)
 # $(ldflags-some-variant/some-target)
@@ -94,6 +92,8 @@
 # 			$1 = object
 # ON_EACH_VARIANT	a list of functions to be evaluated for every variant.
 #			$1 = variant, $2 = full output dir
+#			Any new rules should be defined in a function
+#			passed to ON_EACH_VARIANT.
 #
 # == How to use with FLEX + BISON support ==
 #
@@ -158,7 +158,6 @@ endif
 # Prioritize environment specified variables over our defaults
 var-def = $(if $(findstring $(origin $(1)),default undefined),$(eval $(1) = $(2)))
 
-
 # overriding these in a Makefile while still allowing the user to
 # override them is tricky.
 $(call var-def,BUILD_CC,cc)
@@ -173,6 +172,7 @@ $(call var-def,AS,$(CC))
 $(call var-def,RM,rm -f)
 $(call var-def,FLEX,flex)
 $(call var-def,BISON,bison)
+$(call var-def,MKDIR,mkdir)
 
 # FIXME: checking these is completely wrong, we sould be detecting if certain
 # flags are supported by the compiler by running it with them.
@@ -215,6 +215,7 @@ DBG_FLAGS += -fsanitize=undefined
 endif
 endif
 
+ifndef NO_LTO
 # TODO: use -flto=jobserver
 ifeq ($(CC_TYPE),gcc)
 CFLAGS  ?= -flto $(DBG_FLAGS) -pipe
@@ -222,6 +223,7 @@ LDFLAGS ?= $(ALL_CFLAGS) $(OPT) -fuse-linker-plugin
 else ifeq ($(CC_TYPE),clang)
 CFLAGS  ?= -emit-llvm $(DBG_FLAGS) -pipe
 LDFLAGS ?= $(OPT)
+endif
 else
 CFLAGS  ?= $(OPT) $(DBG_FLAGS) -pipe
 endif
@@ -280,10 +282,12 @@ V=$(VERBOSE)
 endif
 
 ifndef V
+Q=@
 define q
 @printf "  %-7s %s\n" "$1" "$2" ;
 endef
 else
+Q=
 define q
 endef
 endif
@@ -318,6 +322,9 @@ endef
 # Avoid deleting .o files
 .SECONDARY:
 
+# Expand dependency list twice (required for directory creation)
+.SECONDEXPANSION:
+
 # Others append deps to clean to cleanup their own mess
 .PHONY: clean
 clean:
@@ -332,7 +339,7 @@ $(foreach obj,$(obj-all),$(foreach act,$(ON_EACH_OBJ),$(eval $(call $(act),$(obj
 
 # $1 - variant
 # Output - full path to dep files for every object for the given variant
-variant-deps = $(addprefix $(O_)/$1,$(call obj-to-dep,$(obj-all)))
+variant-deps = $(addprefix $(O)/$1,$(call obj-to-dep,$(obj-all)))
 
 # $1 = target name
 # $2 = output dir
@@ -348,7 +355,7 @@ target-obj = $(addprefix $(2)/,$(obj-$(1)))
 # $4 = output dir
 define flags-template
 TRACK_$(1)FLAGS = $(foreach var,$(2),$$($(var))):$$(subst ','\'',$$(ALL_$(1)FLAGS))
-$(4)/.TRACK-$(1)FLAGS: FORCE
+$(4)/.TRACK-$(1)FLAGS: FORCE $$$$(@D)/.dir
 	@FLAGS='$$(TRACK_$(1)FLAGS)'; \
 	if test x"$$$$FLAGS" != x"`cat $(4)/.TRACK-$(1)FLAGS 2>/dev/null`" ; then \
 		echo 1>&2 "    * new $(3)"; \
@@ -365,7 +372,7 @@ dep-gen = -MMD -MF $(call obj-to-dep,$@)
 # $3 = variant name
 define BIN-LINK
 $(call debug,BIN-LINK $1 $2 $3)
-$2/$1$(BIN_EXT): $2/.TRACK-LDFLAGS $(call target-obj,$(1),$2)
+$2/$1$$(BIN_EXT): $2/.TRACK-LDFLAGS $$$$(@D)/.dir $$$$(call target-obj,$(1),$2)
 	$$(QUIET_LINK)$$(CCLD) -o $$@ $$(call target-obj,$(1),$2) $$(ALL_LDFLAGS) $$(ldflags-$(1)) $$(ldflags-$3)
 
 $3: $2/$1$(BIN_EXT)
@@ -382,7 +389,7 @@ endef
 # $3 = variant name
 define SLIB-LINK
 $(call debug,SLIB-LINK $1 $2 $3)
-$(2)/$(1): $(2)/.TRACK-ARFLAGS $(call target-obj,$(1),$2)
+$(2)/$(1): $(2)/.TRACK-ARFLAGS $$(@D)/.dir $$(call target-obj,$(1),$2)
 	$$(QUIET_AR)$$(AR) -o $$@ $$(call target-obj,$(1),$2) $$(ALL_ARFLAGS) $$(arflags-$(1)) $$(arflags-$3)
 
 $3: $2/$1
@@ -405,6 +412,13 @@ endef
 
 $(foreach target,$(TARGET_BIN),$(eval $(call DEF-CLEAN-TARGET,$(target))))
 $(foreach target,$(TARGET_STATIC_LIB),$(eval $(call DEF-CLEAN-TARGET,$(target))))
+
+.dir:
+	touch $@
+
+%/.dir:
+	$(QUIET_MKDIR)$(MKDIR) -p $(@D)
+	touch $@
 
 # $1 = variant directory
 # $2 = full output directory ($(O)/$(1))
@@ -430,20 +444,20 @@ $(call flags-template,LD,LD,link flags,$2)
 $(foreach target,$(TARGET_BIN),$(call BIN-LINK,$(target),$2,$1))
 $(foreach slib,$(TARGET_STATIC_LIB),$(call SLIB-LINK,$(slib),$2,$1))
 
-$2/%.tab.h $2/%.tab.c : %.y
+$2/%.tab.h $2/%.tab.c : %.y $$$$(@D)/.dir
 	$$(QUIET_BISON)$$(BISON) --locations -d \
 		-p '$$(parser-prefix)' -k -b $$* $$<
 
-$2/%.ll.c: %.l
+$2/%.ll.c: %.l $$$$(@D)/.dir
 	$$(QUIET_FLEX)$$(FLEX) -P '$$(parser-prefix)' --bison-locations --bison-bridge -o $$@ $$<
 
-$2/%.o: %.c $2/.TRACK-CFLAGS
+$2/%.o: %.c $2/.TRACK-CFLAGS $$$$(@D)/.dir
 	$$(QUIET_CC)$$(CC) $$(dep-gen) -c -o $$@ $$< $$(ALL_CFLAGS) $$(cflags-$$@) $$(cflags-$1) $$(cflags-$1/$$@)
 
-$2/%.o: %.cc $2/.TRACK-CXXFLAGS
+$2/%.o: %.cc $2/.TRACK-CXXFLAGS $$$$(@D)/.dir
 	$$(QUIET_CXX)$$(CXX) $$(dep-gen) -c -o $$@ $$< $$(ALL_CXXFLAGS) $$(cxxflags-$$@) $$(cxxflags-$1) $$(cxxflags-$1/$$@)
 
-$2/%.o: %.S $2/.TRACK-ASFLAGS
+$2/%.o: %.S $2/.TRACK-ASFLAGS $$$$(@D)/.dir
 	$$(QUIET_AS)$$(AS) -c $$(ALL_ASFLAGS) $$< -o $$@ $$(asflags-$$@) $$(asflags-$1) $$(asflags-$1/$$@)
 
 
@@ -484,9 +498,9 @@ show-cflags:
 
 ifndef NO_INSTALL
 # install into here
-DESTDIR ?= $(PREFIX)
+DESTDIR ?=
 # binarys go here
-BINDIR  ?= $(DESTDIR)/bin
+BINDIR  ?= $(PREFIX)/bin
 .PHONY: install %.install
 %.install: %
 	mkdir -p $(BINDIR)

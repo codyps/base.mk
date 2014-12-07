@@ -1,3 +1,4 @@
+#! /bin/sh
 run_test () {
 	yes "" | ${DIR}/bin/base.mk-import >/dev/null
 	assert_file_exists base.mk
@@ -17,8 +18,10 @@ int main(void)
 EOF
 
 	mkdir x
-	make O=x
+	make O=x VARIANTS="v1 v2"
 
-	assert_file_exists x/test
-	assert_file_exists x/test.o
+	assert_file_exists x/v1/test
+	assert_file_exists x/v1/test.o
+	assert_file_exists x/v2/test
+	assert_file_exists x/v2/test.o
 }

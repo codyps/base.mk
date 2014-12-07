@@ -1,42 +1,52 @@
 #! /bin/sh
 set -eu
 
-error () {
-	echo "ERROR: $(basename $TEST) in $T: $*" >>/dev/stderr
-}
-
-assert () {
-	local msg=$1
-	shift
-	if ! "$@" ; then
-		error "$msg"
-	fi
-}
-
-assert_file_exists () {
-	assert "file $1 does not exist" [ -e "$1" ]
-}
-
-assert_file_not_exist () {
-	assert "file $1 exists" [ ! -e "$1" ]
-}
-
 : ${PRESERVE:=false}
 T_BASE=
-trap 'if ! $PRESERVE; then rm -rf ${T_BASE}; fi' EXIT INT
+trap 'if ! $PRESERVE; then rm -rf "${T_BASE}"; fi' EXIT INT TERM QUIT
 T_BASE="$(mktemp -d --tmpdir base.mk-test.XXXXX)"
 DIR="$(cd $(dirname "$0"); pwd)"
 for TEST in "$DIR"/tests/*.sh.t; do
 	B_TEST=$(basename "$TEST")
-	T="$T_BASE/$B_TEST"
+	T_DIR="$T_BASE/$B_TEST"
+	T_ERROR="$T_BASE/error-$B_TEST"
 	T_LOG="$T_BASE/log-$B_TEST"
-	mkdir -p "$T"
-	. "$TEST"
-	pushd "$T" >/dev/null
-	{ run_test; } >$T_LOG 2>&1 || {
-		echo "I: Test $B_TEST failed"
+	T_RUN="$T_BASE/run-$B_TEST"
+
+	cat "${DIR}/test_prelude.sh" "$TEST" > "$T_RUN"
+	mkdir -p "$T_DIR"
+	
+	cat >>"$T_RUN" <<-EOF
+		export DIR="$DIR"
+		export T_ERROR="$T_ERROR"
+		export T_DIR="$T_DIR"
+		export B_TEST="$B_TEST"
+		cd "$T_DIR"
+		run_test
+	EOF
+
+	chmod +x "$T_RUN"
+	if ! "$T_RUN" >$T_LOG 2>&1 ; then
+		echo ">>>> 1"
+		E=true
+	else
+		E=false
+	fi
+
+	if [ -e "$T_ERROR" ]; then
+		echo ">>>> 2"
+		E=true
+	fi
+
+	if "$E"; then
+		echo ">>> Test $B_TEST failed"
 		cat "$T_LOG"
+		echo ">>> Log file: '$T_LOG'"
+		echo ">>> Test exe: '$T_RUN'"
 		PRESERVE=true
-	}
-	popd >/dev/null
+	fi
 done
+
+if $PRESERVE; then
+	echo ">>> Preserving test output: '$T_BASE'"
+fi
