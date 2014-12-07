@@ -3,7 +3,7 @@
 # == Targets ==
 # all
 #
-# $(TARGET_BIN)	executable binaries (built in all VARIANTS)
+# $(TARGET_BIN)	        executable binaries (built in all VARIANTS)
 # $(TARGET_STATIC_LIB)	static libraries (built in all VARIANTS)
 # $(VARIANTS)		a collection of the global bins & slibs built with
 #			particular flags
@@ -143,8 +143,6 @@ O = .
 # No variants by default
 VARIANTS = .
 
-# TARGET_BIN should be used in new code
-TARGET_BIN ?= $(TARGETS)
 TARGET_ALL = $(TARGET_BIN) $(TARGET_STATIC_LIB)
 
 # link against things here
@@ -389,7 +387,7 @@ endef
 # $3 = variant name
 define SLIB-LINK
 $(call debug,SLIB-LINK $1 $2 $3)
-$(2)/$(1): $(2)/.TRACK-ARFLAGS $$(@D)/.dir $$(call target-obj,$(1),$2)
+$(2)/$(1): $(2)/.TRACK-ARFLAGS $$$$(@D)/.dir $$$$(call target-obj,$(1),$2)
 	$$(QUIET_AR)$$(AR) -o $$@ $$(call target-obj,$(1),$2) $$(ALL_ARFLAGS) $$(arflags-$(1)) $$(arflags-$3)
 
 $3: $2/$1
