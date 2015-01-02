@@ -20,4 +20,9 @@ EOF
 
 	assert_file_exists test
 	assert_file_exists test.c.o
+
+	make clean
+
+	assert_file_not_exist test
+	assert_file_not_exist test.c.o
 }
