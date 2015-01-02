@@ -399,18 +399,6 @@ $3.clean: $2/$1.clean
 
 endef
 
-# Provide $target.clean which maps to a clean across all variants
-# $1 = bin-name
-define DEF-CLEAN-TARGET
-$(call debug,DEF-CLEAN-TARGET $1)
-.PHONY: $1.clean
-$1.clean: $(foreach variant,$(VARIANTS),$(variant)/$1.clean)
-
-endef
-
-$(foreach target,$(TARGET_BIN),$(eval $(call DEF-CLEAN-TARGET,$(target))))
-$(foreach target,$(TARGET_STATIC_LIB),$(eval $(call DEF-CLEAN-TARGET,$(target))))
-
 .dir:
 	touch $@
 
