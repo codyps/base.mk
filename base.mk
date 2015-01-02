@@ -449,13 +449,13 @@ $2/%.tab.h $2/%.tab.c : %.y $$$$(@D)/.dir
 $2/%.ll.c: %.l $$$$(@D)/.dir
 	$$(QUIET_FLEX)$$(FLEX) -P '$$(parser-prefix)' --bison-locations --bison-bridge -o $$@ $$<
 
-$2/%.o: %.c $2/.TRACK-CFLAGS $$$$(@D)/.dir
+$2/%.c.o: %.c $2/.TRACK-CFLAGS $$$$(@D)/.dir
 	$$(QUIET_CC)$$(CC) $$(dep-gen) -c -o $$@ $$< $$(ALL_CFLAGS) $$(cflags-$$@) $$(cflags-$1) $$(cflags-$1/$$@)
 
-$2/%.o: %.cc $2/.TRACK-CXXFLAGS $$$$(@D)/.dir
+$2/%.cc.o: %.cc $2/.TRACK-CXXFLAGS $$$$(@D)/.dir
 	$$(QUIET_CXX)$$(CXX) $$(dep-gen) -c -o $$@ $$< $$(ALL_CXXFLAGS) $$(cxxflags-$$@) $$(cxxflags-$1) $$(cxxflags-$1/$$@)
 
-$2/%.o: %.S $2/.TRACK-ASFLAGS $$$$(@D)/.dir
+$2/%.S.o: %.S $2/.TRACK-ASFLAGS $$$$(@D)/.dir
 	$$(QUIET_AS)$$(AS) -c $$(ALL_ASFLAGS) $$< -o $$@ $$(asflags-$$@) $$(asflags-$1) $$(asflags-$1/$$@)
 
 

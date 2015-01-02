@@ -5,7 +5,7 @@ run_test () {
 
 	cat >Makefile <<EOF
 TARGET_BIN = test
-obj-test = test.o
+obj-test = test.c.o
 include base.mk
 EOF
 
@@ -20,5 +20,5 @@ EOF
 	make O=x
 
 	assert_file_exists x/test
-	assert_file_exists x/test.o
+	assert_file_exists x/test.c.o
 }
